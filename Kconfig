@@ -1,0 +1,14 @@
+menu "Hello AtomVM BLE SwitchBot"
+
+config HELLO_ATOMVM_BLE_SWITCHBOT
+    bool "Enable SwitchBot BLE port driver"
+    default y
+    select BT_ENABLED
+    select BT_NIMBLE_ENABLED
+    help
+        Enables the SwitchBot BLE port driver demo.
+
+        This forces ESP-IDF Bluetooth and NimBLE host support on so that
+        headers like host/ble_gap.h and esp_nimble_cfg.h are available.
+
+endmenu
