@@ -1,55 +1,33 @@
 defmodule SampleApp.Port do
-  @moduledoc """
-  Minimal Elixir wrapper for the native AtomVM port driver (`sample_app_port`).
-
-  Protocol:
-
-  - Request: `<<opcode::8, payload::binary>>`
-  - Reply:
-    - success: `<<0x00, payload::binary>>`
-    - error:   `<<0x01, code::8>>`
-
-  Opcodes:
-
-  - `0x01` Ping: expects `<<"PONG">>`
-  - `0x02` Echo: returns the payload unchanged
-  """
+  @moduledoc false
 
   @compile {:no_warn_undefined, :port}
 
-  # Must match the port driver name registered in the firmware (C side).
-  @port_name "sample_app_port"
-
-  @op_ping 0x01
-  @op_echo 0x02
+  @driver ~c"sample_app_port"
 
   def open() do
-    :erlang.open_port({:spawn, @port_name}, [:binary])
+    :erlang.open_port({:spawn_driver, @driver}, [:binary])
   end
 
-  def ping(port) do
-    case :port.call(port, <<@op_ping>>) do
-      <<0x00, "PONG">> ->
-        :ok
+  def ping(port), do: call(port, 0x01)
+  def echo(port, payload) when is_binary(payload), do: call(port, 0x02, payload)
 
-      <<0x01, code>> ->
-        {:error, {:driver_error, code}}
+  def ble_start(port), do: call(port, 0x10)
+  def ble_stop(port), do: call(port, 0x11)
 
-      other ->
-        {:error, {:unexpected_reply, other}}
-    end
+  def latest(port), do: call(port, 0x12)
+
+  def latest_for_id(port, id) when is_integer(id) and id in 0..0xFFFF do
+    call(port, 0x13, <<id::16-big>>)
   end
 
-  def echo(port, payload) when is_binary(payload) do
-    case :port.call(port, <<@op_echo, payload::binary>>) do
-      <<0x00, echoed::binary>> ->
-        {:ok, echoed}
+  defp call(port, opcode, payload \\ <<>>) do
+    req = <<opcode, payload::binary>>
 
-      <<0x01, code>> ->
-        {:error, {:driver_error, code}}
-
-      other ->
-        {:error, {:unexpected_reply, other}}
+    case :port.call(port, req) do
+      <<0x00, rest::binary>> -> {:ok, rest}
+      <<0x01, code>> -> {:error, {:driver_error, code}}
+      other -> {:error, {:bad_reply, other}}
     end
   end
 end
